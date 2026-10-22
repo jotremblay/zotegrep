@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZoteGrep</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<meta name="theme-color" content="#c8323a">
+<link rel="stylesheet" href="/static/fonts/fonts.css">
+<link rel="stylesheet" href="/static/pdfjs/pdf_viewer.css">
+
+<style>
+  :root {
+    --bg: #e4e6ea; --panel: #f1f2f4; --field: #ffffff; --sunken: #e7e9ed; --rule: #d8dbe1;
+    --ink: #15181e; --ink2: #4a5260; --ink3: #767e8c;
+    --accent: #c8323a; --accent-soft: #f9e9ea;
+    --sans: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+    --serif: "IBM Plex Serif", Georgia, serif;
+    --mono: "IBM Plex Mono", "Cascadia Code", Consolas, monospace;
+  }
+  [data-theme="dark"] {
+    --bg: #0c0e11; --panel: #121418; --field: #181b20; --sunken: #22262d; --rule: #2b3038;
+    --ink: #e7e9ed; --ink2: #a5acb8; --ink3: #737b88;
+    --accent: #f06a70; --accent-soft: #33191b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { color-scheme: light; }
+  html[data-theme="dark"] { color-scheme: dark; }
+  html, body { height: 100%; overflow: hidden; }
+  body { font-family: var(--sans); font-size: 13px; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  input, button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .toolbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 10;
+    background: var(--panel); border-bottom: 1px solid var(--rule);
+    display: flex; align-items: center; gap: 12px; padding: 0 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ink); flex-shrink: 0; font-family: var(--mono); font-size: 16px; font-weight: 600; letter-spacing: -.3px; }
+  .brand img { width: 28px; height: 28px; }
+  .brand .z { color: #e84044; }
+  .brand mark { position: relative; isolation: isolate; background: none; color: #2a2200; padding: 0 4px; margin-left: 1px; }
+  .brand mark::before { content: ""; position: absolute; inset: 2px -1px 0; z-index: -1; background: #ffe566; border-radius: 2px; transform: rotate(-2deg) skewX(-10deg); }
+  [data-theme="dark"] .brand mark { color: #f6e38a; }
+  [data-theme="dark"] .brand mark::before { background: rgba(240, 210, 70, .24); }
+  .doc-title {
+    flex: 1; min-width: 0; font-family: var(--serif); font-size: 14px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .doc-title small { font-family: var(--sans); font-size: 12.5px; font-weight: 400; color: var(--ink2); margin-left: 10px; }
+  .group { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  .tb-btn {
+    height: 30px; min-width: 30px; padding: 0 9px; font-size: 13px; font-weight: 500;
+    border: 1px solid var(--rule); border-radius: 4px;
+    background: var(--field); color: var(--ink2); cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .tb-btn:hover { border-color: var(--ink3); color: var(--ink); }
+  .tb-btn:disabled { opacity: .4; cursor: default; }
+  .tb-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .tb-input {
+    height: 30px; padding: 0 9px; font-size: 13px; color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 4px; background: var(--field); outline: none;
+  }
+  .tb-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  #findInput { width: 240px; font-family: var(--mono); }
+  #findInput::placeholder { font-family: var(--sans); color: var(--ink3); }
+  #pageInput { width: 48px; text-align: center; font-variant-numeric: tabular-nums; }
+  .count { font-size: 12px; color: var(--ink2); min-width: 64px; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .count.none { color: var(--accent); }
+  .sep { width: 1px; height: 22px; background: var(--rule); flex-shrink: 0; }
+
+  #viewerContainer { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; overflow: auto; }
+  .pdfViewer .page { box-shadow: 0 1px 6px rgba(0,0,0,.18); border: none; margin: 12px auto; }
+  /* Occurrence courante bien distincte des autres surlignages */
+  .textLayer .highlight { background-color: rgba(255, 221, 51, .5); border-radius: 2px; }
+  .textLayer .highlight.selected { background-color: rgba(200, 50, 58, .5); }
+
+  .message { position: absolute; top: 40%; left: 0; right: 0; text-align: center; color: var(--ink2); font-size: 14px; }
+
+  @media (max-width: 900px) {
+    .doc-title, .brand span, .hide-sm { display: none; }
+    #findInput { width: 130px; font-size: 16px; }
+    .toolbar { gap: 8px; padding: 0 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <a class="brand" href="/" title="Back to ZoteGrep"><img src="/static/favicon.png" alt=""><span><span class="z">Zote</span><mark>Grep</mark></span></a>
+  <div class="doc-title" id="docTitle"></div>
+
+  <div class="group">
+    <input class="tb-input" id="findInput" type="text" placeholder="Find in document" aria-label="Find in document" autocomplete="off">
+    <span class="count" id="findCount"></span>
+    <button class="tb-btn" id="findPrev" title="Previous match (Shift+Enter)" aria-label="Previous match"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
+    <button class="tb-btn" id="findNext" title="Next match (Enter)" aria-label="Next match"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+  </div>
+  <div class="sep"></div>
+  <div class="group">
+    <input class="tb-input" id="pageInput" aria-label="Page" type="text" inputmode="numeric" value="1">
+    <span class="count" id="pageTotal" style="min-width:auto">/ &ndash;</span>
+  </div>
+  <div class="sep hide-sm"></div>
+  <div class="group hide-sm">
+    <button class="tb-btn" id="zoomOut" title="Zoom out">&minus;</button>
+    <button class="tb-btn" id="zoomFit" title="Fit width">Fit</button>
+    <button class="tb-btn" id="zoomIn" title="Zoom in">+</button>
+  </div>
+  <div class="sep hide-sm"></div>
+  <div class="group">
+    <a class="tb-btn hide-sm" id="zoteroLink" style="display:none" title="Open this item in the Zotero desktop app">Zotero</a>
+    <a class="tb-btn" id="rawLink" target="_blank" rel="noopener" title="Open the original PDF">PDF</a>
+  </div>
+</div>
+
+<div id="viewerContainer"><div id="viewer" class="pdfViewer"></div></div>
+<div class="message" id="message">Loading PDF...</div>
+
+<script type="module">
+const PDFJS = '/static/pdfjs';  // copie locale de pdfjs-dist, voir VERSION.txt
+const $ = s => document.querySelector(s);
+
+const theme = localStorage.getItem('zg_theme');
+if (theme === 'dark' || (!theme && matchMedia('(prefers-color-scheme: dark)').matches)) {
+  document.documentElement.setAttribute('data-theme', 'dark');
+}
+
+const params = new URLSearchParams(location.search);
+const key = params.get('key') || '';
+const startPage = Math.max(1, parseInt(params.get('page'), 10) || 1);
+const query = (params.get('q') || '').replace(/\s+/g, ' ').trim();
+const caseSensitive = params.get('case') === '1';
+
+function fail(text) { $('#message').textContent = text; $('#message').style.display = ''; }
+
+async function main() {
+  if (!/^[A-Za-z0-9]{1,20}$/.test(key)) return fail('Invalid document.');
+  $('#rawLink').href = `/api/pdf/${key}#page=${startPage}`;
+
+  fetch(`/api/item/${key}`).then(r => r.ok ? r.json() : null).then(item => {
+    if (!item) return;
+    document.title = `${item.title} - ZoteGrep`;
+    const meta = [item.date, item.authors].filter(Boolean).join(', ');
+    $('#docTitle').textContent = item.title;
+    if (meta) {
+      const small = document.createElement('small');
+      small.textContent = meta;
+      $('#docTitle').appendChild(small);
+    }
+    if (item.zotero_select) {
+      $('#zoteroLink').href = item.zotero_select;
+      $('#zoteroLink').style.display = '';
+    }
+  }).catch(() => {});
+
+  const pdfjsLib = await import(`${PDFJS}/pdf.min.mjs`);
+  globalThis.pdfjsLib = pdfjsLib;
+  const { EventBus, PDFViewer, PDFLinkService, PDFFindController } = await import(`${PDFJS}/pdf_viewer.mjs`);
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS}/pdf.worker.min.mjs`;
+
+  const eventBus = new EventBus();
+  const linkService = new PDFLinkService({ eventBus });
+  const findController = new PDFFindController({ eventBus, linkService });
+  const viewer = new PDFViewer({
+    container: $('#viewerContainer'), eventBus, linkService, findController,
+  });
+  linkService.setViewer(viewer);
+
+  function find(type, findPrevious = false) {
+    const q = $('#findInput').value.trim();
+    eventBus.dispatch('find', {
+      source: window, type, query: q, caseSensitive,
+      entireWord: false, phraseSearch: true, highlightAll: true,
+      findPrevious, matchDiacritics: false,
+    });
+    if (!q) $('#findCount').textContent = '';
+  }
+
+  function showCount({ current = 0, total = 0 } = {}) {
+    const el = $('#findCount');
+    if (!$('#findInput').value.trim()) { el.textContent = ''; return; }
+    el.textContent = total ? `${current} / ${total}` : 'No match';
+    el.classList.toggle('none', !total);
+  }
+  eventBus.on('updatefindmatchescount', e => showCount(e.matchesCount));
+  eventBus.on('updatefindcontrolstate', e => showCount(e.matchesCount));
+
+  eventBus.on('pagesinit', () => {
+    viewer.currentScaleValue = 'page-width';
+    viewer.currentPageNumber = Math.min(startPage, viewer.pagesCount);
+    $('#pageTotal').textContent = `/ ${viewer.pagesCount}`;
+    if (query) {
+      $('#findInput').value = query;
+      // La recherche part de la page courante : la première occurrence
+      // sélectionnée est donc celle de la page du résultat cliqué.
+      find('');
+    }
+  });
+  eventBus.on('pagechanging', e => { $('#pageInput').value = e.pageNumber; });
+
+  $('#findInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); find('again', e.shiftKey); }
+  });
+  let debounce;
+  $('#findInput').addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => find(''), 250);
+  });
+  $('#findNext').onclick = () => find('again', false);
+  $('#findPrev').onclick = () => find('again', true);
+  $('#pageInput').addEventListener('change', e => {
+    const n = parseInt(e.target.value, 10);
+    if (n >= 1 && n <= viewer.pagesCount) viewer.currentPageNumber = n;
+    else e.target.value = viewer.currentPageNumber;
+  });
+  $('#zoomIn').onclick = () => { viewer.currentScale = Math.min(viewer.currentScale * 1.15, 5); };
+  $('#zoomOut').onclick = () => { viewer.currentScale = Math.max(viewer.currentScale / 1.15, 0.25); };
+  $('#zoomFit').onclick = () => { viewer.currentScaleValue = 'page-width'; };
+  window.addEventListener('resize', () => {
+    if (viewer.currentScaleValue === 'page-width') viewer.currentScaleValue = 'page-width';
+  });
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      e.preventDefault();
+      $('#findInput').focus();
+      $('#findInput').select();
+    }
+  });
+
+  let doc;
+  try {
+    doc = await pdfjsLib.getDocument({
+      url: `/api/pdf/${key}`,
+      cMapUrl: `${PDFJS}/cmaps/`, cMapPacked: true,
+      standardFontDataUrl: `${PDFJS}/standard_fonts/`,
+    }).promise;
+  } catch (err) {
+    return fail(err?.status === 404 ? 'PDF not found.' : `Could not load this PDF (${err?.message || err}).`);
+  }
+  $('#message').style.display = 'none';
+  viewer.setDocument(doc);
+  linkService.setDocument(doc, null);
+}
+
+main().catch(err => fail(`Could not start the viewer (${err?.message || err}).`));
+</script>
+</body>
+</html>

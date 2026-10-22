@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZoteGrep</title>
+
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="apple-touch-icon" href="/static/favicon.png">
+
+<meta property="og:title" content="ZoteGrep">
+<meta property="og:description" content="Full-text search engine for your Zotero PDF library.">
+<meta property="og:image" content="/static/favicon.png">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#c8323a">
+
+<link rel="stylesheet" href="/static/fonts/fonts.css">
+
+<style>
+  :root {
+    --bg: #f1f2f4; --panel: #ffffff; --sunken: #e7e9ed; --rule: #d8dbe1;
+    --ink: #15181e; --ink2: #4a5260; --ink3: #767e8c;
+    --accent: #c8323a; --accent-hover: #a9252c; --accent-soft: #f9e9ea; --on-accent: #ffffff;
+    --mark: #ffe566; --mark-ink: #2a2200;
+    --ok: #1f8a4c; --warn: #b7791f; --danger: #c8323a;
+    --shadow-pop: 0 8px 28px rgba(16, 20, 28, .16);
+    --sans: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+    --serif: "IBM Plex Serif", Georgia, serif;
+    --mono: "IBM Plex Mono", "Cascadia Code", Consolas, monospace;
+    --brand-red: #e84044;
+    --hh: 52px; --side: 264px;
+  }
+  [data-theme="dark"] {
+    --bg: #121418; --panel: #181b20; --sunken: #22262d; --rule: #2b3038;
+    --ink: #e7e9ed; --ink2: #a5acb8; --ink3: #737b88;
+    --accent: #f06a70; --accent-hover: #f4888d; --accent-soft: #33191b; --on-accent: #1a0b0c;
+    --mark: rgba(240, 210, 70, .24); --mark-ink: #f6e38a;
+    --ok: #4ade80; --warn: #fbbf24; --danger: #f06a70;
+    --shadow-pop: 0 8px 28px rgba(0, 0, 0, .5);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html { color-scheme: light; }
+  html[data-theme="dark"] { color-scheme: dark; }
+  body {
+    font-family: var(--sans); font-size: 13px; line-height: 1.5;
+    background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased;
+  }
+  input, button, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ink3); }
+  .ic { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  mark { background: var(--mark); color: var(--mark-ink); padding: 0 2px; border-radius: 2px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+
+  /* ------------------------------------------------------------ contrôles */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 30px; padding: 0 12px; font-size: 13px; font-weight: 500; white-space: nowrap;
+    border: 1px solid var(--rule); border-radius: 4px; background: var(--panel); color: var(--ink2);
+    text-decoration: none;
+  }
+  .btn:hover { border-color: var(--ink3); color: var(--ink); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+  .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--on-accent); }
+  .btn.small { height: 26px; padding: 0 9px; font-size: 12px; }
+  .btn.icon { width: 30px; padding: 0; position: relative; }
+  .btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+  .btn.quiet { border-color: transparent; background: none; }
+  .btn.quiet:hover { background: var(--sunken); border-color: transparent; }
+
+  .field, .form-input, .modal select {
+    width: 100%; height: 30px; padding: 0 9px; font-size: 13px;
+    border: 1px solid var(--rule); border-radius: 4px; background: var(--panel); color: var(--ink); outline: none;
+  }
+  .field:focus, .form-input:focus, .modal select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .field::placeholder, .form-input::placeholder { color: var(--ink3); }
+  .form-input, .modal select { height: 36px; font-size: 14px; }
+  .form-input:disabled, .modal select:disabled { opacity: .55; }
+
+  /* ------------------------------------------------------------ formulaires */
+  .form-group { margin-bottom: 12px; }
+  .form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--ink2); margin-bottom: 4px; }
+
+  /* ------------------------------------------------------------ barre du haut */
+  .topbar {
+    position: sticky; top: 0; z-index: 50; height: var(--hh);
+    display: grid; grid-template-columns: calc(var(--side) - 16px) minmax(0, 1fr) auto; align-items: center; gap: 0 16px;
+    padding: 0 16px 0 16px; background: var(--bg); border-bottom: 1px solid var(--rule);
+  }
+  .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; font-family: var(--mono); font-size: 16px; font-weight: 600; letter-spacing: -.3px; }
+  .brand img { width: 28px; height: 28px; object-fit: contain; }
+  .brand .z { color: var(--brand-red); }
+  .brand mark { position: relative; isolation: isolate; background: none; color: var(--mark-ink); padding: 0 4px; margin-left: 1px; }
+  .brand mark::before { content: ""; position: absolute; inset: 2px -1px 0; z-index: -1; background: var(--mark); border-radius: 2px; transform: rotate(-2deg) skewX(-10deg); }
+  .search { position: relative; display: flex; gap: 8px; max-width: 900px; }
+  .search-box {
+    flex: 1; min-width: 0; height: 34px; display: flex; align-items: center; gap: 4px; padding: 0 4px 0 10px;
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; color: var(--ink3);
+  }
+  .search-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .search-box input[type=text] {
+    flex: 1; min-width: 0; height: 100%; padding: 0 6px; border: none; outline: none; background: none;
+    font-family: var(--mono); font-size: 13.5px; color: var(--ink);
+  }
+  .search-box input[type=text]::placeholder { font-family: var(--sans); color: var(--ink3); }
+  .search-box kbd { font-family: var(--sans); font-size: 11px; color: var(--ink3); padding: 0 6px; white-space: nowrap; }
+  .tgl { position: relative; display: inline-flex; }
+  .tgl input { position: absolute; opacity: 0; pointer-events: none; }
+  .tgl span, .tgl-btn {
+    display: grid; place-items: center; min-width: 26px; height: 24px; padding: 0 5px;
+    font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--ink3);
+    border: 1px solid transparent; border-radius: 3px; background: none; cursor: pointer; user-select: none;
+  }
+  .tgl span:hover, .tgl-btn:hover { background: var(--sunken); color: var(--ink); }
+  .tgl input:checked + span { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .tgl input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .search .btn.primary { height: 34px; padding: 0 16px; }
+
+  .search-history {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 60; display: none;
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; box-shadow: var(--shadow-pop);
+    max-height: 300px; overflow-y: auto;
+  }
+  .search-history.visible { display: block; }
+  .search-history-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 10px; font-size: 12px; color: var(--ink3); border-bottom: 1px solid var(--rule);
+  }
+  .search-history-header button { background: none; border: none; font-size: 12px; color: var(--ink3); }
+  .search-history-header button:hover { color: var(--danger); }
+  .search-history-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; cursor: pointer; color: var(--ink3); }
+  .search-history-item:hover { background: var(--sunken); }
+  .hist-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
+
+  .topbar-right { display: flex; align-items: center; gap: 6px; }
+  .sync-area { display: flex; align-items: center; gap: 7px; margin-right: 4px; font-size: 12px; color: var(--ink2); min-width: 0; }
+  #syncLabel { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--ink3); }
+  .dot.running { background: var(--warn); animation: pulse 1.2s ease-in-out infinite; }
+  .dot.done { background: var(--ok); }
+  .dot.error { background: var(--danger); }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .badge {
+    position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px; padding: 0 4px;
+    display: grid; place-items: center; border-radius: 8px; font-size: 10px; font-weight: 600;
+    background: var(--accent); color: var(--on-accent);
+  }
+  #filtersBtn { display: none; }
+
+  .sync-log {
+    max-height: 132px; overflow-y: auto; padding: 8px 16px; font-family: var(--mono); font-size: 12px;
+    color: var(--ink2); background: var(--sunken); border-bottom: 1px solid var(--rule);
+  }
+
+  /* ------------------------------------------------------------ mise en page */
+  .layout { display: grid; grid-template-columns: var(--side) minmax(0, 1fr); align-items: start; }
+  .sidebar, .pane { position: sticky; top: var(--hh); height: calc(100vh - var(--hh)); overflow-y: auto; }
+  .sidebar { padding: 14px 12px 18px; border-right: 1px solid var(--rule); display: flex; flex-direction: column; gap: 18px; }
+  .main { min-width: 0; min-height: calc(100vh - var(--hh)); background: var(--panel); display: flex; flex-direction: column; }
+  .pane { display: none; border-left: 1px solid var(--rule); padding: 18px 20px 28px; }
+  .backdrop { display: none; }
+
+  /* ------------------------------------------------------------ filtres */
+  .side-group > h2, .side-head { font-size: 12px; font-weight: 600; color: var(--ink); }
+  .side-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .side-group > h2 { margin-bottom: 6px; }
+  .side-head button { background: none; border: none; font-size: 12px; color: var(--ink3); }
+  .side-head button:hover { color: var(--accent); }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--rule); border-radius: 4px; background: var(--panel); overflow: hidden; }
+  .seg label { position: relative; display: block; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg span { display: block; text-align: center; padding: 4px 2px; font-size: 12px; color: var(--ink2); cursor: pointer; border-left: 1px solid var(--rule); }
+  .seg label:first-child span { border-left: none; }
+  .seg span:hover { color: var(--ink); }
+  .seg input:checked + span { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tree { max-height: max(140px, calc(100vh - var(--hh) - 610px)); overflow-y: auto; margin: 0 -4px; }
+  .tree.short { max-height: 168px; }
+  .tree-lib { padding: 8px 8px 2px; font-size: 11px; color: var(--ink3); }
+  .tree-row {
+    display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left;
+    padding: 3px 8px 3px calc(8px + var(--d, 0) * 13px);
+    background: none; border: none; border-radius: 3px; font-size: 12.5px; color: var(--ink2);
+  }
+  .tree-row:hover { background: var(--sunken); color: var(--ink); }
+  .tree-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tree-row .n { font-size: 11.5px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+  .tree-row.on { background: var(--accent-soft); color: var(--ink); font-weight: 600; box-shadow: inset 2px 0 0 var(--accent); }
+  .tree-empty { padding: 3px 8px; font-size: 12px; color: var(--ink3); }
+  .year-row { display: flex; align-items: center; gap: 6px; color: var(--ink3); }
+  .stats { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--rule); display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 12px; }
+  .stats dt { color: var(--ink3); }
+  .stats dd { text-align: right; color: var(--ink2); font-variant-numeric: tabular-nums; }
+  .stat-link { background: none; border: none; font-size: 12px; color: var(--ink2); text-decoration: underline dotted; }
+  .stat-link:hover { color: var(--accent); }
+
+  /* ------------------------------------------------------------ résultats */
+  .toolbar {
+    position: sticky; top: var(--hh); z-index: 20; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px;
+    padding: 8px 20px; background: var(--panel); border-bottom: 1px solid var(--rule);
+  }
+  .toolbar-status { flex: 1; min-width: 180px; color: var(--ink2); }
+  .toolbar-status b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .toolbar-status .note { color: var(--ink3); font-size: 12px; }
+  #statusLine.searching #statusText::before {
+    content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 8px;
+    border-radius: 50%; background: var(--accent); vertical-align: 1px;
+    animation: searchPulse 1s ease-in-out infinite;
+  }
+  @keyframes searchPulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+  .toolbar-tools { display: flex; align-items: center; gap: 6px; }
+  .toolbar-tools label { font-size: 12px; color: var(--ink3); }
+  .toolbar-tools select.field { width: auto; height: 26px; font-size: 12px; padding: 0 4px; }
+  .active-filters { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+  .active-filters:empty { display: none; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 4px 0 8px; font-size: 12px;
+    background: var(--accent-soft); color: var(--ink); border: none; border-radius: 3px;
+  }
+  .chip i { font-style: normal; color: var(--ink3); }
+  .chip .ic { width: 12px; height: 12px; color: var(--ink3); }
+  .chip:hover .ic { color: var(--danger); }
+
+  .results { flex: 1; }
+  .paper { padding: 11px 20px 10px; border-bottom: 1px solid var(--rule); cursor: pointer; }
+  .paper:hover { background: color-mix(in srgb, var(--sunken) 45%, var(--panel)); }
+  .paper.sel { background: var(--bg); box-shadow: inset 3px 0 0 var(--accent); }
+  .paper-head { display: flex; align-items: baseline; gap: 16px; }
+  .paper-title { flex: 1; min-width: 0; font-family: var(--serif); font-size: 15.5px; font-weight: 600; line-height: 1.35; }
+  .paper-count { flex-shrink: 0; font-size: 12px; color: var(--ink3); white-space: nowrap; }
+  .paper-count b { font-size: 13px; color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .paper-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; margin-top: 1px; font-size: 12.5px; color: var(--ink2); }
+  .paper-meta .year { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .paper-meta .pub { font-style: italic; }
+  .tags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+  .tag-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--c, transparent); }
+  .tag-dot.none { box-shadow: inset 0 0 0 1px var(--ink3); opacity: .5; }
+  .tree-row .tag-dot { align-self: center; }
+  .tags > span > .tag-dot { margin-right: 5px; }
+  .tags > span { display: inline-flex; align-items: center; padding: 0 6px; font-size: 11px; line-height: 17px; color: var(--ink2); background: var(--sunken); border-radius: 3px; }
+  .hits { margin-top: 6px; }
+  .hit { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 0 12px; padding: 2px 0; text-decoration: none; border-radius: 3px; }
+  .hit:hover .hit-text { color: var(--ink); }
+  .hit:hover .hit-loc { color: var(--accent); }
+  .hit-loc { text-align: right; font-size: 11.5px; line-height: 20px; color: var(--ink3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .hit-text { font-family: var(--serif); font-size: 13px; line-height: 20px; color: var(--ink2); overflow-wrap: anywhere; }
+  .paper-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 14px; margin-top: 6px; font-size: 12px; }
+  .paper-foot a, .paper-foot button { background: none; border: none; font-size: 12px; color: var(--ink3); text-decoration: none; padding: 1px 0; }
+  .paper-foot a:hover, .paper-foot button:hover { color: var(--accent); text-decoration: underline; }
+  .paper-foot .more { margin-left: auto; color: var(--ink2); font-weight: 500; }
+  .hits-note { padding: 4px 0 0 86px; font-size: 12px; color: var(--ink3); }
+
+  .empty-state { padding: 72px 24px; text-align: center; }
+  .empty-state-text { font-family: var(--serif); font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .empty-state-hint { color: var(--ink2); }
+
+  /* ------------------------------------------------------------ accueil */
+  .home { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 0; flex: 1; }
+  .home section { padding: 20px 24px 28px; }
+  .home section + section { border-left: 1px solid var(--rule); }
+  .home h2 { font-family: var(--serif); font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+  .home .lead { color: var(--ink2); margin-bottom: 12px; max-width: 62ch; }
+  .syntax-table { width: 100%; border-collapse: collapse; }
+  .syntax-table td { padding: 7px 12px 7px 0; border-top: 1px solid var(--rule); vertical-align: top; color: var(--ink2); }
+  .syntax-table td:first-child { white-space: nowrap; width: 1%; }
+  .syntax-table code, .syntax-table button.ex {
+    font-family: var(--mono); font-size: 12.5px; color: var(--ink); background: var(--sunken);
+    padding: 1px 6px; border-radius: 3px; border: none;
+  }
+  .syntax-table button.ex:hover { background: var(--accent-soft); color: var(--accent); }
+  .recent-list { list-style: none; }
+  .recent-list li { border-top: 1px solid var(--rule); }
+  .recent-list button {
+    display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 0; text-align: left;
+    background: none; border: none; color: var(--ink3);
+  }
+  .recent-list button span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
+  .recent-list button:hover span { color: var(--accent); }
+  .recent-list time { font-size: 11.5px; color: var(--ink3); }
+
+  .setup-prompt { max-width: 520px; margin: 0 auto; padding: 96px 24px; }
+  .setup-prompt h2 { font-family: var(--serif); font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+  .setup-prompt p { font-size: 14px; color: var(--ink2); margin-bottom: 18px; }
+  .setup-prompt .btn { height: 36px; padding: 0 18px; font-size: 14px; }
+
+  /* ------------------------------------------------------------ panneau de détail */
+  .pane-empty { color: var(--ink3); padding-top: 40px; text-align: center; }
+  .pane h2 { font-family: var(--serif); font-size: 19px; font-weight: 600; line-height: 1.3; }
+  .pane-meta { margin-top: 6px; color: var(--ink2); }
+  .pane-meta .pub { font-style: italic; }
+  .pane .tags { margin-top: 8px; }
+  .pane-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .pane h3 { display: flex; align-items: baseline; justify-content: space-between; margin: 20px 0 6px; padding-bottom: 5px; font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--rule); }
+  .pane h3 span { font-weight: 400; color: var(--ink3); }
+  .abstract { font-family: var(--serif); font-size: 13.5px; line-height: 1.6; color: var(--ink2); }
+  .abstract.clamp { display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+  .link-btn { background: none; border: none; font-size: 12px; color: var(--accent); margin-top: 4px; }
+  .link-btn:hover { text-decoration: underline; }
+  .pane .hit { grid-template-columns: 64px minmax(0, 1fr); padding: 4px 0; border-bottom: 1px solid var(--rule); }
+  .pane .hit:last-child { border-bottom: none; }
+  .pane .hits-note { padding: 8px 0 0; }
+
+  /* ------------------------------------------------------------ pied, modales, divers */
+  .site-footer { padding: 12px 20px; border-top: 1px solid var(--rule); font-size: 12px; color: var(--ink3); display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .site-footer a { text-decoration: none; }
+  .site-footer a:hover { color: var(--accent); }
+
+  .modal-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px; background: rgba(10, 12, 16, .5); }
+  .modal-overlay.hidden { display: none; }
+  .modal { width: 100%; max-width: 460px; padding: 22px 24px; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; box-shadow: var(--shadow-pop); }
+  .modal.wide { max-width: 600px; max-height: 88vh; overflow-y: auto; }
+  .modal > h2 { font-family: var(--serif); font-size: 19px; font-weight: 600; margin-bottom: 14px; }
+  .modal h3 { margin: 20px 0 10px; padding-bottom: 5px; font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--rule); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .form-hint { font-size: 12px; color: var(--ink3); margin-top: 4px; line-height: 1.5; }
+  .form-hint a { color: var(--accent); text-decoration: none; }
+  .form-hint a:hover { text-decoration: underline; }
+  .form-hint b { color: var(--ink2); font-weight: 500; }
+  .form-row { display: flex; gap: 10px; }
+  .form-row > .form-group { flex: 1; min-width: 0; }
+  .lib-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+  .lib-item-main { flex: 1; min-width: 0; }
+  .lib-item-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lib-item-sub { font-size: 12px; color: var(--ink2); }
+  .lib-empty { color: var(--ink3); padding: 2px 0 6px; }
+  .info-list div { padding: 7px 0; border-top: 1px solid var(--rule); color: var(--ink2); }
+  .info-list b { color: var(--ink); font-weight: 600; }
+
+  .scroll-top { position: fixed; bottom: 16px; right: 16px; z-index: 40; display: none; box-shadow: var(--shadow-pop); }
+  .scroll-top.visible { display: inline-flex; }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; z-index: 200; transform: translate(-50%, 60px);
+    padding: 8px 16px; font-weight: 500; background: var(--ink); color: var(--bg); border-radius: 4px;
+    opacity: 0; transition: transform .2s ease, opacity .2s ease; pointer-events: none;
+  }
+  .toast.visible { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ------------------------------------------------------------ largeurs */
+  @media (min-width: 1280px) {
+    .layout.has-pane { grid-template-columns: var(--side) minmax(0, 1fr) clamp(380px, 36vw, 720px); }
+    .layout.has-pane .pane { display: block; }
+    .layout.has-pane .paper-foot .more { display: none; }
+  }
+  @media (max-width: 1100px) {
+    #syncLabel { display: none; }
+  }
+  @media (max-width: 900px) {
+    :root { --hh: 94px; }
+    .topbar { grid-template-columns: 1fr auto; grid-template-rows: 46px 40px; align-content: start; padding: 0 12px; gap: 0 8px; }
+    .search { grid-column: 1 / -1; grid-row: 2; max-width: none; }
+    .search-box kbd { display: none; }
+    #filtersBtn { display: inline-flex; }
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    .sidebar {
+      position: fixed; top: 0; left: 0; z-index: 90; width: min(300px, 86vw); height: 100vh;
+      background: var(--bg); transform: translateX(-100%); transition: transform .2s ease; visibility: hidden;
+    }
+    .tree { max-height: max(140px, calc(100vh - 570px)); }
+    /* 16px : évite le zoom automatique d'iOS à la prise de focus */
+    .field, .search-box input[type=text] { font-size: 16px; }
+    body.filters-open .sidebar { transform: none; visibility: visible; box-shadow: var(--shadow-pop); }
+    body.filters-open .backdrop { display: block; position: fixed; inset: 0; z-index: 80; background: rgba(10, 12, 16, .5); }
+    .toolbar { padding: 8px 12px; }
+    .paper { padding: 10px 12px; }
+    .hit { grid-template-columns: 56px minmax(0, 1fr); gap: 0 8px; }
+    .hits-note { padding-left: 64px; }
+    .home { grid-template-columns: minmax(0, 1fr); }
+    .home section { padding: 16px 12px 20px; }
+    .home section + section { border-left: none; border-top: 1px solid var(--rule); }
+    .syntax-table td { display: block; padding: 0 0 8px; border: none; }
+    .syntax-table td:first-child { width: auto; white-space: normal; padding: 8px 0 3px; border-top: 1px solid var(--rule); }
+    .site-footer { padding: 12px; }
+  }
+  @media (max-width: 480px) {
+    .brand span { display: none; }
+    .toolbar-tools label { display: none; }
+    .form-row { flex-direction: column; gap: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h10M18 18h2"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 11A8 8 0 0 0 5.6 7M4 4v3.5h3.5M4 13a8 8 0 0 0 14.4 4M20 20v-3.5h-3.5"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6 7.5V18l-4 2v-7.5z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
+</svg>
+
+<div id="appScreen" style="display:none">
+
+<header class="topbar">
+  <a class="brand" href="/" onclick="resetSearch(); return false;" title="New search">
+    <img src="/static/favicon.png" alt=""><span><span class="z">Zote</span><mark>Grep</mark></span>
+  </a>
+  <div class="search" id="searchWrapper">
+    <div class="search-box">
+      <svg class="ic"><use href="#i-search"/></svg>
+      <input type="text" id="query" placeholder="Search inside your PDFs" autofocus autocomplete="off" spellcheck="false" aria-label="Search query">
+      <kbd id="searchKbd">Ctrl K</kbd>
+      <label class="tgl" title="Case sensitive"><input type="checkbox" id="caseCb" onchange="onToggleChange()" aria-label="Case sensitive"><span>Aa</span></label>
+      <label class="tgl" title="Regular expression"><input type="checkbox" id="regexCb" onchange="onToggleChange()" aria-label="Regular expression"><span>.*</span></label>
+      <button type="button" class="tgl-btn" onclick="showSyntaxHelp()" title="Search syntax" aria-label="Search syntax">?</button>
+    </div>
+    <button class="btn primary" onclick="doSearch()">Search</button>
+    <div class="search-history" id="searchHistory"></div>
+  </div>
+  <div class="topbar-right">
+    <div class="sync-area">
+      <span class="dot" id="syncDot"></span>
+      <span id="syncLabel">Idle</span>
+      <button class="btn small" id="syncBtn" onclick="onSyncBtn()">Sync</button>
+    </div>
+    <button class="btn icon" id="filtersBtn" onclick="toggleFilters()" title="Filters" aria-label="Filters"><svg class="ic"><use href="#i-filter"/></svg><span class="badge" id="filterCount" hidden></span></button>
+    <button class="btn icon" onclick="toggleTheme()" title="Switch light / dark" aria-label="Switch light or dark theme" id="themeBtn"><svg class="ic"><use href="#i-moon"/></svg></button>
+    <button class="btn icon" onclick="openSettings()" title="Settings" aria-label="Settings"><svg class="ic"><use href="#i-settings"/></svg></button>
+  </div>
+</header>
+
+<div class="sync-log" id="syncLog" style="display:none"></div>
+
+<div id="setupPrompt" class="setup-prompt" style="display:none">
+  <h2>Connect your Zotero library</h2>
+  <p>ZoteGrep downloads the PDFs of your library, indexes every page, then lets you search inside all of them at once. You need a Zotero API key and your library ID. Everything stays on this computer.</p>
+  <button class="btn primary" onclick="openSettings()">Add a library</button>
+</div>
+
+<div id="mainContent" class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="Filters">
+    <div class="side-group">
+      <h2>All terms in the same</h2>
+      <div class="seg" id="scopeSeg">
+        <label><input type="radio" name="scope" value="doc" checked onchange="onOptionChange()"><span>Paper</span></label>
+        <label><input type="radio" name="scope" value="page" onchange="onOptionChange()"><span>Page</span></label>
+        <label><input type="radio" name="scope" value="paragraph" onchange="onOptionChange()"><span>Paragraph</span></label>
+      </div>
+    </div>
+    <div class="side-group" id="fLibraryField" style="display:none">
+      <h2><label for="fLibrary">Library</label></h2>
+      <select class="field" id="fLibrary" onchange="onLibraryFilterChange()"></select>
+    </div>
+    <div class="side-group">
+      <div class="side-head"><span>Collection</span><button type="button" id="clearFiltersBtn" onclick="clearFilters()" hidden>Clear all filters</button></div>
+      <div class="tree" id="fCollections"></div>
+    </div>
+    <div class="side-group">
+      <h2>Tags</h2>
+      <div class="tree short" id="fTags"></div>
+    </div>
+    <div class="side-group">
+      <h2><label for="fYearFrom">Year</label></h2>
+      <div class="year-row">
+        <input class="field" id="fYearFrom" type="number" placeholder="from" onchange="onOptionChange()" aria-label="From year">
+        <span>&ndash;</span>
+        <input class="field" id="fYearTo" type="number" placeholder="to" onchange="onOptionChange()" aria-label="To year">
+      </div>
+    </div>
+    <div class="side-group">
+      <h2><label for="fAuthor">Author</label></h2>
+      <input class="field" id="fAuthor" type="text" list="authorList" placeholder="Any author" onchange="onOptionChange()">
+      <datalist id="authorList"></datalist>
+    </div>
+    <dl class="stats" id="stats">
+      <dt>PDFs</dt><dd id="statPdfs">&ndash;</dd>
+      <dt>Pages indexed</dt><dd id="statPages">&ndash;</dd>
+      <dt id="statNoTextLabel" hidden>Without text</dt><dd id="statNoText" hidden></dd>
+      <dt>Last sync</dt><dd id="syncLastTime">&ndash;</dd>
+    </dl>
+  </aside>
+  <div class="backdrop" onclick="toggleFilters(false)"></div>
+
+  <main class="main">
+    <div class="toolbar" id="statusLine" style="display:none">
+      <div class="toolbar-status" id="statusText" role="status"></div>
+      <div class="toolbar-tools">
+        <label for="sortSelect">Sort</label>
+        <select class="field" id="sortSelect" onchange="applySortAndRender()">
+          <option value="relevance">Relevance</option>
+          <option value="matches">Most matches</option>
+          <option value="title">Title A-Z</option>
+          <option value="title-desc">Title Z-A</option>
+          <option value="date-desc">Date (newest)</option>
+          <option value="date">Date (oldest)</option>
+          <option value="page">Page number</option>
+        </select>
+        <span id="statusRight" class="toolbar-tools"></span>
+      </div>
+      <div class="active-filters" id="activeFilters"></div>
+    </div>
+    <div class="results" id="results"></div>
+    <footer class="site-footer">
+      <span>ZoteGrep <span id="appVersion"></span></span>
+      <a href="https://github.com/marcpinet/zotegrep" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/marcpinet/zotegrep/issues" target="_blank" rel="noopener">Report an issue</a>
+    </footer>
+  </main>
+
+  <aside class="pane" id="pane" aria-label="Selected paper"></aside>
+</div>
+
+</div>
+
+<div class="modal-overlay hidden" id="settingsModal">
+  <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <h2 id="settingsTitle">Settings</h2>
+
+    <h3 style="margin-top:0">Zotero libraries</h3>
+    <div id="libList"></div>
+
+    <h3 id="libFormTitle">Add a library</h3>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="setLibName">Name (optional)</label>
+        <input type="text" class="form-input" id="setLibName" placeholder="e.g. Thesis" maxlength="60">
+      </div>
+      <div class="form-group">
+        <label for="setLibType">Library type</label>
+        <select id="setLibType">
+          <option value="user">User (personal library)</option>
+          <option value="group">Group (shared library)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="setApiKey">API key</label>
+      <input type="text" class="form-input" id="setApiKey" placeholder="Your Zotero API key" autocomplete="off">
+      <div class="form-hint">
+        Generate an API key in your <a href="https://www.zotero.org/settings/security#applications" target="_blank" rel="noopener">Zotero security settings</a>.
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="setLibId">Library ID</label>
+      <input type="text" class="form-input" id="setLibId" placeholder="e.g. 1234567">
+      <div class="form-hint">
+        Your library ID, also referred to as <a href="https://www.zotero.org/settings/security#applications" target="_blank" rel="noopener">user ID</a> is shown <b>just below the "Create new private key" button</b>.
+        For groups, <a href="https://www.zotero.org/groups/" target="_blank" rel="noopener">find your group ID here</a> <b>(you must be logged in)</b>. <a href="https://forums.zotero.org/discussion/71055/where-do-i-find-the-groupid" target="_blank" rel="noopener">Can't find your group ID?</a>
+      </div>
+    </div>
+    <div class="modal-actions" style="margin-top:8px">
+      <button class="btn" id="libCancelEdit" onclick="resetLibraryForm()" style="display:none">Cancel edit</button>
+      <button class="btn primary" id="libSubmit" onclick="submitLibrary()">Add library</button>
+    </div>
+
+    <h3>Sync</h3>
+    <div class="form-group">
+      <label for="setSyncInt">Sync interval (minutes, min 10, 0 to sync only when you click Sync)</label>
+      <input type="number" class="form-input" id="setSyncInt" value="10" min="0">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeSettings()">Close</button>
+      <button class="btn primary" onclick="saveSettings()">Save interval</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="infoModal">
+  <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+    <h2 id="infoTitle"></h2>
+    <div id="infoBody"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeInfo()">Close</button>
+    </div>
+  </div>
+</div>
+
+<button class="btn icon scroll-top" id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Back to top"><svg class="ic"><use href="#i-up"/></svg></button>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const icon = name => `<svg class="ic" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+const fmt = n => Number(n).toLocaleString();
+const wideMq = window.matchMedia('(min-width: 1280px)');
+const drawerMq = window.matchMedia('(max-width: 900px)');
+let currentUser = null;
+let lastGrouped = null;
+let shownGroups = [];
+let selectedKey = null;
+let facets = null;
+let tagFilters = [];
+let collectionFilter = '';
+let editingLibraryId = null;
+let searchHistory = JSON.parse(localStorage.getItem('zg_history') || '[]');
+const itemCache = new Map();
+
+function initTheme() {
+  const saved = localStorage.getItem('zg_theme');
+  if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+  updateThemeIcon();
+}
+
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  if (isDark) {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('zg_theme', 'light');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('zg_theme', 'dark');
+  }
+  updateThemeIcon();
+}
+
+function updateThemeIcon() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const btn = $('#themeBtn');
+  if (btn) btn.innerHTML = icon(isDark ? 'sun' : 'moon');
+}
+
+initTheme();
+
+function showApp(data) {
+  $('#appScreen').style.display = '';
+  $('#appVersion').textContent = data.version ? `v${data.version}` : '';
+  currentUser = data;
+
+  if (!data.has_zotero) {
+    $('#setupPrompt').style.display = '';
+    $('#mainContent').style.display = 'none';
+  } else {
+    $('#setupPrompt').style.display = 'none';
+    $('#mainContent').style.display = '';
+    loadFacets().then(restoreFromUrl);
+  }
+}
+
+async function init() {
+  try {
+    const r = await fetch('/api/state');
+    showApp(await r.json());
+    pollSync();
+  } catch (e) {
+    document.body.textContent = `Cannot reach the ZoteGrep server (${e.message}). Is \`zotegrep serve\` still running?`;
+  }
+}
+
+function openSettings() {
+  $('#setSyncInt').value = currentUser?.settings?.sync_interval ?? 10;
+  renderLibraries();
+  resetLibraryForm();
+  $('#settingsModal').classList.remove('hidden');
+}
+
+function closeSettings() {
+  $('#settingsModal').classList.add('hidden');
+}
+
+function renderLibraries() {
+  const libs = currentUser?.libraries || [];
+  const list = $('#libList');
+  list.innerHTML = '';
+  if (!libs.length) {
+    list.innerHTML = '<div class="lib-empty">No library yet. Add your first one below.</div>';
+    return;
+  }
+  for (const lib of libs) {
+    const row = document.createElement('div');
+    row.className = 'lib-item';
+    row.innerHTML = `
+      <div class="lib-item-main">
+        <div class="lib-item-name">${esc(lib.label)}</div>
+        <div class="lib-item-sub">${lib.zotero_library_type === 'group' ? 'Group' : 'User'} library, ID ${esc(lib.zotero_library_id)}</div>
+      </div>
+      <button class="btn small">Edit</button>
+      <button class="btn small danger">Remove</button>
+    `;
+    const [editBtn, removeBtn] = row.querySelectorAll('button');
+    editBtn.onclick = () => editLibrary(lib);
+    removeBtn.onclick = () => removeLibrary(lib);
+    list.appendChild(row);
+  }
+}
+
+function resetLibraryForm() {
+  editingLibraryId = null;
+  $('#libFormTitle').textContent = 'Add a library';
+  $('#libSubmit').textContent = 'Add library';
+  $('#libCancelEdit').style.display = 'none';
+  $('#setLibName').value = '';
+  $('#setApiKey').value = '';
+  $('#setApiKey').placeholder = 'Your Zotero API key';
+  $('#setLibId').value = '';
+  $('#setLibId').disabled = false;
+  $('#setLibType').value = 'user';
+  $('#setLibType').disabled = false;
+}
+
+function editLibrary(lib) {
+  editingLibraryId = lib.id;
+  $('#libFormTitle').textContent = `Edit "${lib.label}"`;
+  $('#libSubmit').textContent = 'Save library';
+  $('#libCancelEdit').style.display = '';
+  $('#setLibName').value = lib.name || '';
+  $('#setApiKey').value = '';
+  $('#setApiKey').placeholder = 'Leave blank to keep current key';
+  // Changer d'ID ou de type reviendrait à suivre une autre bibliothèque.
+  $('#setLibId').value = lib.zotero_library_id;
+  $('#setLibId').disabled = true;
+  $('#setLibType').value = lib.zotero_library_type;
+  $('#setLibType').disabled = true;
+}
+
+async function submitLibrary() {
+  const body = {
+    name: $('#setLibName').value.trim(),
+    zotero_api_key: $('#setApiKey').value.trim(),
+    zotero_library_id: $('#setLibId').value.trim(),
+    zotero_library_type: $('#setLibType').value,
+  };
+  const creating = editingLibraryId === null;
+  const r = await fetch(creating ? '/api/libraries' : `/api/libraries/${editingLibraryId}`, {
+    method: creating ? 'POST' : 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { showToast(data.error || 'Could not save the library'); return; }
+  showToast(creating ? 'Library added, syncing...' : 'Library saved');
+  await init();
+  renderLibraries();
+  resetLibraryForm();
+  if (creating || body.zotero_api_key) triggerSync();
+  else pollSync();
+}
+
+async function removeLibrary(lib) {
+  if (!confirm(`Remove "${lib.label}" from ZoteGrep?\n\nIts PDFs and search index will be deleted from this server (nothing changes in Zotero).`)) return;
+  const r = await fetch(`/api/libraries/${lib.id}`, { method: 'DELETE' });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { showToast(data.error || 'Could not remove the library'); return; }
+  showToast('Library removed');
+  await init();
+  renderLibraries();
+  pollSync();
+}
+
+async function saveSettings() {
+  const r = await fetch('/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ sync_interval: Math.max(0, parseInt($('#setSyncInt').value) || 0) }),
+  });
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}));
+    showToast(data.error || 'Could not save settings');
+    return;
+  }
+  showToast('Settings saved');
+  init();
+}
+
+function showInfo(title, html) {
+  $('#infoTitle').textContent = title;
+  $('#infoBody').innerHTML = html;
+  $('#infoModal').classList.remove('hidden');
+}
+
+function closeInfo() {
+  $('#infoModal').classList.add('hidden');
+}
+
+// Une seule source pour l'aide de syntaxe : modale (exemples inertes) et
+// page d'accueil (exemples cliquables qui remplissent la barre de recherche).
+const SYNTAX = [
+  ['time series', 'Flexible phrase: also matches <i>time-series</i>, <i>timeseries</i>, <i>Time Series</i>. Accents are ignored.'],
+  ['anomaly, transformer', 'AND: both must appear (<code>AND</code> works too). Where they must co-occur is set by <b>All terms in the same</b>: paper, page or paragraph.'],
+  ['mamba OR s4', 'OR: either one.'],
+  ['anomaly, -forecasting', 'Exclusion (<code>NOT forecasting</code> works too).'],
+  ['"RAG"', 'Exact phrase, whole words only (does not match <i>fragment</i>).'],
+  ['channel NEAR/5 independent', 'Both within 5 words of each other, in any order. <code>NEAR</code> alone means 10.'],
+];
+
+function syntaxTable(clickable) {
+  const rows = SYNTAX.map(([ex, text]) => `<tr><td>${clickable
+    ? `<button type="button" class="ex" data-ex="${esc(ex)}" title="Put this example in the search bar">${esc(ex)}</button>`
+    : `<code>${esc(ex)}</code>`}</td><td>${text}</td></tr>`).join('');
+  return `<table class="syntax-table">${rows}
+    <tr><td><code>.*</code></td><td>With the <b>.*</b> toggle on, the whole query is one regular expression (no operators).</td></tr>
+  </table>`;
+}
+
+function showSyntaxHelp() {
+  showInfo('Search syntax', `${syntaxTable(false)}
+    <p class="form-hint" style="margin-top:12px">Searches PDF text, titles, authors, abstracts, and your Zotero notes and annotations. Leave the query empty and pick a filter to browse papers.</p>
+  `);
+}
+
+async function showNoText() {
+  const r = await fetch('/api/no-text');
+  if (!r.ok) return;
+  const { items } = await r.json();
+  showInfo('PDFs without searchable text', `
+    <p class="form-hint" style="margin-bottom:8px">These PDFs have no text layer (scans or images) and OCR found nothing usable, so full-text search cannot see inside them. Their title, abstract, notes and annotations remain searchable.</p>
+    <div class="info-list">${items.map(it => `<div><b>${esc(it.title)}</b><br>${esc([it.date, it.authors].filter(Boolean).join(' - ') || it.filename)}</div>`).join('') || '<div>None.</div>'}</div>
+  `);
+}
+
+// ---------------------------------------------------------------- filtres
+
+async function loadFacets() {
+  try {
+    const r = await fetch('/api/facets');
+    if (!r.ok) return;
+    facets = await r.json();
+  } catch { return; }
+  const state = uiState();
+  renderFilterOptions();
+  applyFilterValues(state);
+}
+
+function renderFilterOptions() {
+  const libs = currentUser?.libraries || [];
+  $('#fLibraryField').style.display = libs.length > 1 ? '' : 'none';
+  $('#fLibrary').innerHTML = '<option value="">All libraries</option>'
+    + libs.map(l => `<option value="${l.id}">${esc(l.label)}</option>`).join('');
+  renderCollections();
+  renderTags();
+  $('#authorList').innerHTML = (facets?.authors || []).map(a => `<option value="${esc(a.name)}"></option>`).join('');
+  if (facets?.year_min) {
+    $('#fYearFrom').placeholder = facets.year_min;
+    $('#fYearTo').placeholder = facets.year_max;
+  }
+}
+
+function visibleCollections() {
+  const onlyLib = $('#fLibrary').value;
+  return (facets?.collections || []).filter(c => !onlyLib || String(c.library_id) === onlyLib);
+}
+
+function renderCollections() {
+  const libs = currentUser?.libraries || [];
+  const all = visibleCollections();
+  if (facets && collectionFilter && !all.some(c => c.key === collectionFilter)) collectionFilter = '';
+  const row = (key, name, count, depth) => `
+    <button type="button" class="tree-row${key === collectionFilter ? ' on' : ''}" data-key="${esc(key)}" style="--d:${depth}" title="${esc(name)}">
+      <span class="name">${esc(name)}</span>${count != null ? `<span class="n">${count}</span>` : ''}
+    </button>`;
+  const walk = (libId, parent, depth) => all
+    .filter(c => c.library_id === libId && (c.parent_key || null) === parent)
+    .map(c => row(c.key, c.name, c.count, depth) + walk(libId, c.key, depth + 1))
+    .join('');
+  const libIds = [...new Set(all.map(c => c.library_id))];
+  let html = row('', 'All collections', null, 0);
+  for (const id of libIds) {
+    const lib = libs.find(l => l.id === id);
+    if (libIds.length > 1 && lib) html += `<div class="tree-lib">${esc(lib.label)}</div>`;
+    html += walk(id, null, 0);
+  }
+  const box = $('#fCollections');
+  box.innerHTML = html;
+  box.querySelectorAll('.tree-row').forEach(btn => {
+    btn.onclick = () => {
+      collectionFilter = btn.dataset.key === collectionFilter ? '' : btn.dataset.key;
+      renderCollections();
+      onOptionChange();
+    };
+  });
+}
+
+function onLibraryFilterChange() {
+  renderCollections();
+  onOptionChange();
+}
+
+// Pastille de la couleur attribuée au tag dans Zotero (rien si le tag n'en a pas).
+function tagColor(name) {
+  const color = (facets?.tags || []).find(t => t.name === name)?.color;
+  return /^#[0-9a-f]{6}$/i.test(color || '') ? color : '';
+}
+
+function tagDot(name, always = false) {
+  const color = tagColor(name);
+  if (!color && !always) return '';
+  return color ? `<span class="tag-dot" style="--c:${color}"></span>` : '<span class="tag-dot none"></span>';
+}
+
+function renderTags() {
+  const known = facets?.tags || [];
+  // Un tag venu de l'URL peut ne plus exister dans les facettes : on le garde
+  // affiché pour qu'il reste désactivable.
+  const extra = tagFilters.filter(t => !known.some(k => k.name === t)).map(name => ({ name, count: null }));
+  const box = $('#fTags');
+  const all = [...extra, ...known];
+  if (!all.length) { box.innerHTML = '<div class="tree-empty">No tags in this library.</div>'; return; }
+  box.innerHTML = all.map(t => `
+    <button type="button" class="tree-row${tagFilters.includes(t.name) ? ' on' : ''}" data-tag="${esc(t.name)}" aria-pressed="${tagFilters.includes(t.name)}" title="${esc(t.name)}">
+      ${tagDot(t.name, true)}<span class="name">${esc(t.name)}</span>${t.count != null ? `<span class="n">${t.count}</span>` : ''}
+    </button>`).join('');
+  box.querySelectorAll('.tree-row').forEach(btn => {
+    btn.onclick = () => {
+      const tag = btn.dataset.tag;
+      tagFilters = tagFilters.includes(tag) ? tagFilters.filter(t => t !== tag) : [...tagFilters, tag];
+      renderTags();
+      onOptionChange();
+    };
+  });
+}
+
+function toggleFilters(open) {
+  document.body.classList.toggle('filters-open', open);
+}
+
+function clearFilters() {
+  applyFilterValues({ library: '', collection: '', tags: [], yf: '', yt: '', author: '' });
+  onOptionChange();
+}
+
+function applyFilterValues(state) {
+  $('#fLibrary').value = state.library || '';
+  collectionFilter = state.collection || '';
+  renderCollections();
+  tagFilters = [...(state.tags || [])];
+  renderTags();
+  $('#fYearFrom').value = state.yf || '';
+  $('#fYearTo').value = state.yt || '';
+  $('#fAuthor').value = state.author || '';
+  updateFilterChip();
+}
+
+function updateFilterChip() {
+  const s = uiState();
+  const n = countFilters(s);
+  $('#filterCount').textContent = n;
+  $('#filterCount').hidden = !n;
+  $('#clearFiltersBtn').hidden = !n;
+
+  // Rappel des filtres actifs au-dessus des résultats (la colonne de filtres
+  // est repliée sur mobile) ; chaque puce retire son filtre.
+  const chips = [];
+  const add = (label, value, clear, dot = '') => chips.push({ label, value, clear, dot });
+  if (s.library) {
+    const lib = (currentUser?.libraries || []).find(l => String(l.id) === s.library);
+    add('Library', lib ? lib.label : s.library, () => { $('#fLibrary').value = ''; renderCollections(); });
+  }
+  if (s.collection) {
+    const col = (facets?.collections || []).find(c => c.key === s.collection);
+    add('Collection', col ? col.name : s.collection, () => { collectionFilter = ''; renderCollections(); });
+  }
+  for (const tag of s.tags) add('Tag', tag, () => { tagFilters = tagFilters.filter(t => t !== tag); renderTags(); }, tagDot(tag));
+  if (s.yf) add('From', s.yf, () => { $('#fYearFrom').value = ''; });
+  if (s.yt) add('To', s.yt, () => { $('#fYearTo').value = ''; });
+  if (s.author) add('Author', s.author, () => { $('#fAuthor').value = ''; });
+  const box = $('#activeFilters');
+  box.innerHTML = '';
+  for (const c of chips) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip';
+    chip.title = 'Remove this filter';
+    chip.innerHTML = `<i>${esc(c.label)}</i>${c.dot}${esc(c.value)}${icon('x')}`;
+    chip.onclick = () => { c.clear(); onOptionChange(); };
+    box.appendChild(chip);
+  }
+}
+
+// ---------------------------------------------------------------- état <-> URL
+
+function uiState() {
+  return {
+    q: $('#query').value.trim(),
+    case: $('#caseCb').checked,
+    regex: $('#regexCb').checked,
+    scope: document.querySelector('input[name=scope]:checked')?.value || 'doc',
+    sort: $('#sortSelect').value,
+    library: $('#fLibrary').value,
+    collection: collectionFilter,
+    tags: [...tagFilters],
+    yf: $('#fYearFrom').value.trim(),
+    yt: $('#fYearTo').value.trim(),
+    author: $('#fAuthor').value.trim(),
+  };
+}
+
+function countFilters(s) {
+  return [s.library, s.collection, s.yf, s.yt, s.author].filter(Boolean).length + s.tags.length;
+}
+
+// URL de la page : noms courts, valeurs par défaut omises -> lien partageable.
+function stateToUrl(s) {
+  const p = new URLSearchParams();
+  if (s.q) p.set('q', s.q);
+  if (s.case) p.set('case', '1');
+  if (s.regex) p.set('regex', '1');
+  if (s.scope !== 'doc') p.set('scope', s.scope);
+  if (s.sort !== 'relevance') p.set('sort', s.sort);
+  if (s.library) p.set('lib', s.library);
+  if (s.collection) p.set('col', s.collection);
+  s.tags.forEach(t => p.append('tag', t));
+  if (s.yf) p.set('from', s.yf);
+  if (s.yt) p.set('to', s.yt);
+  if (s.author) p.set('author', s.author);
+  const qs = p.toString();
+  return qs ? `/?${qs}` : '/';
+}
+
+function urlToState() {
+  const p = new URLSearchParams(location.search);
+  return {
+    q: p.get('q') || '',
+    case: p.get('case') === '1',
+    regex: p.get('regex') === '1',
+    scope: p.get('scope') || 'doc',
+    sort: p.get('sort') || 'relevance',
+    library: p.get('lib') || '',
+    collection: p.get('col') || '',
+    tags: p.getAll('tag'),
+    yf: p.get('from') || '',
+    yt: p.get('to') || '',
+    author: p.get('author') || '',
+  };
+}
+
+function apiQuery(s) {
+  const p = new URLSearchParams({ q: s.q, case: s.case, regex: s.regex, scope: s.scope });
+  if (s.library) p.set('library', s.library);
+  if (s.collection) p.set('collection', s.collection);
+  s.tags.forEach(t => p.append('tag', t));
+  if (s.yf) p.set('year_from', s.yf);
+  if (s.yt) p.set('year_to', s.yt);
+  if (s.author) p.set('author', s.author);
+  return p.toString();
+}
+
+function applyState(s) {
+  $('#query').value = s.q;
+  $('#caseCb').checked = s.case;
+  $('#regexCb').checked = s.regex;
+  const scope = document.querySelector(`input[name=scope][value="${CSS.escape(s.scope)}"]`)
+    || document.querySelector('input[name=scope][value=doc]');
+  scope.checked = true;
+  $('#sortSelect').value = s.sort;
+  if (!$('#sortSelect').value) $('#sortSelect').value = 'relevance';
+  applyFilterValues(s);
+}
+
+function restoreFromUrl() {
+  const s = urlToState();
+  applyState(s);
+  if (s.q || countFilters(s)) doSearch({ push: false });
+  else clearResults();
+}
+
+window.addEventListener('popstate', () => { if (currentUser?.has_zotero) restoreFromUrl(); });
+
+function onOptionChange() {
+  updateFilterChip();
+  const s = uiState();
+  if (s.q || countFilters(s)) doSearch();
+  else { clearResults(); history.pushState(null, '', '/'); }
+}
+
+function onToggleChange() {
+  if ($('#query').value.trim()) doSearch();
+}
+
+function addToHistory(query) {
+  const q = query.trim();
+  if (!q) return;
+  searchHistory = searchHistory.filter(h => h.query !== q);
+  searchHistory.unshift({ query: q, time: Date.now() });
+  if (searchHistory.length > 20) searchHistory = searchHistory.slice(0, 20);
+  localStorage.setItem('zg_history', JSON.stringify(searchHistory));
+}
+
+function showSearchHistory() {
+  const el = $('#searchHistory');
+  const q = $('#query').value.trim().toLowerCase();
+  // Sur l'accueil, les recherches récentes sont déjà listées dans la page.
+  if (!searchHistory.length || (!q && !lastGrouped)) { el.classList.remove('visible'); return; }
+  const filtered = q
+    ? searchHistory.filter(h => h.query.toLowerCase().includes(q) && h.query.toLowerCase() !== q)
+    : searchHistory;
+  if (!filtered.length) { el.classList.remove('visible'); return; }
+
+  el.innerHTML = `
+    <div class="search-history-header">
+      <span>Recent searches</span>
+      <button onclick="clearHistory(event)">Clear all</button>
+    </div>
+    ${filtered.slice(0, 8).map(h => `
+      <div class="search-history-item">
+        ${icon('clock')}
+        <span class="hist-text">${esc(h.query)}</span>
+      </div>
+    `).join('')}
+  `;
+  el.querySelectorAll('.search-history-item').forEach((item, i) => {
+    item.addEventListener('click', () => useHistoryItem(filtered[i].query));
+  });
+  el.classList.add('visible');
+}
+
+function hideSearchHistory() {
+  setTimeout(() => { $('#searchHistory').classList.remove('visible'); }, 200);
+}
+
+function useHistoryItem(q) {
+  $('#query').value = q;
+  $('#searchHistory').classList.remove('visible');
+  doSearch();
+}
+
+function clearHistory(e) {
+  e.stopPropagation();
+  searchHistory = [];
+  localStorage.setItem('zg_history', '[]');
+  $('#searchHistory').classList.remove('visible');
+  if (!lastGrouped) renderHome();
+}
+
+function timeAgo(ts) {
+  const min = Math.round((Date.now() - ts) / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min} min ago`;
+  if (min < 60 * 24) return `${Math.round(min / 60)} h ago`;
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function renderHome() {
+  const recent = searchHistory.slice(0, 12);
+  $('#results').innerHTML = `
+    <div class="home">
+      <section>
+        <h2>Search syntax</h2>
+        <p class="lead">Searches PDF text, titles, authors, abstracts, and your Zotero notes and annotations. Leave the query empty and pick a filter on the left to browse papers.</p>
+        ${syntaxTable(true)}
+      </section>
+      <section>
+        <h2>Recent searches</h2>
+        ${recent.length ? `
+          <p class="lead">Kept in this browser only. <button type="button" class="link-btn" style="margin:0" onclick="clearHistory(event)">Clear</button></p>
+          <ul class="recent-list">${recent.map((h, i) => `
+            <li><button type="button" data-i="${i}">${icon('clock')}<span>${esc(h.query)}</span><time>${timeAgo(h.time)}</time></button></li>`).join('')}
+          </ul>` : '<p class="lead">Your last searches will be listed here.</p>'}
+      </section>
+    </div>`;
+  $('#results').querySelectorAll('button.ex').forEach(btn => {
+    btn.onclick = () => { $('#query').value = btn.dataset.ex; $('#query').focus(); };
+  });
+  $('#results').querySelectorAll('.recent-list button').forEach(btn => {
+    btn.onclick = () => useHistoryItem(recent[btn.dataset.i].query);
+  });
+}
+
+function setPane(on) {
+  $('#mainContent').classList.toggle('has-pane', on);
+  if (!on) { selectedKey = null; $('#pane').innerHTML = ''; }
+}
+
+function clearResults() {
+  $('#statusLine').style.display = 'none';
+  $('#statusRight').innerHTML = '';
+  $('#searchHistory').classList.remove('visible');
+  lastGrouped = null;
+  shownGroups = [];
+  cancelSearch();
+  setPane(false);
+  renderHome();
+}
+
+function resetSearch() {
+  applyState({ q: '', case: false, regex: false, scope: 'doc', sort: 'relevance',
+               library: '', collection: '', tags: [], yf: '', yt: '', author: '' });
+  clearResults();
+  if (location.search) history.pushState(null, '', '/');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  $('#query').focus();
+}
+
+$('#query').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+  if (e.key === 'Escape') { $('#searchHistory').classList.remove('visible'); $('#query').blur(); }
+});
+$('#query').addEventListener('focus', showSearchHistory);
+$('#query').addEventListener('input', showSearchHistory);
+$('#query').addEventListener('blur', hideSearchHistory);
+
+let searchSeq = 0;
+let searchAbort = null;
+let lastSearchParams = '';
+
+// Abandonne la recherche en cours : le flux est coupé côté navigateur, et le
+// serveur, voyant la connexion fermée, arrête de chercher.
+function cancelSearch() {
+  searchSeq++;
+  if (searchAbort) { searchAbort.abort(); searchAbort = null; }
+  $('#statusLine').classList.remove('searching');
+}
+
+function setSearchStatus(state, { papers, matches, scanned, total, truncated, partial }) {
+  const p = `<b>${fmt(papers)}</b> paper${papers !== 1 ? 's' : ''}`;
+  let html = state.q ? `<b>${fmt(matches)}</b> match${matches !== 1 ? 'es' : ''} in ${p}` : p;
+  if (partial) html += ` <span class="note">&middot; searching${total ? ` ${fmt(scanned)}/${fmt(total)}` : ''}...</span>`;
+  else if (truncated) html += ' <span class="note">(only the first matches of each paper are listed)</span>';
+  $('#statusText').innerHTML = html;
+}
+
+// Résultats affichés au fil de l'eau : le serveur envoie chaque papier dès qu'il
+// est trouvé (les plus prometteurs d'abord), on l'insère à sa place dans le tri
+// courant. Lancer une autre recherche annule celle-ci.
+async function doSearch({ push = true } = {}) {
+  const state = uiState();
+  if (!state.q && !countFilters(state)) return;
+  cancelSearch();
+  const seq = searchSeq;
+  const abort = searchAbort = new AbortController();
+
+  if (state.q) addToHistory(state.q);
+  $('#searchHistory').classList.remove('visible');
+  if (push) {
+    const url = stateToUrl(state);
+    if (url !== location.pathname + location.search) history.pushState(null, '', url);
+  }
+
+  $('#statusLine').style.display = 'flex';
+  $('#statusLine').classList.add('searching');
+  $('#statusText').textContent = 'Searching...';
+  $('#statusRight').innerHTML = '';
+  $('#results').innerHTML = '';
+  lastGrouped = [];
+  shownGroups = [];
+  rowByKey.clear();
+  setPane(false);
+
+  const progress = { papers: 0, matches: 0, scanned: 0, total: 0, partial: true };
+  const finish = () => {
+    if (seq !== searchSeq) return;
+    searchAbort = null;
+    $('#statusLine').classList.remove('searching');
+  };
+  const showEmpty = () => {
+    $('#results').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-text">Nothing matches this search</div>
+        <div class="empty-state-hint">Try different keywords, a wider scope (All terms in the same: Paper), or fewer filters.</div>
+      </div>`;
+  };
+
+  const handle = (ev) => {
+    if (ev.type === 'start') {
+      progress.total = ev.total;
+    } else if (ev.type === 'progress') {
+      progress.scanned = ev.done;
+    } else if (ev.type === 'doc') {
+      progress.papers++;
+      progress.matches += ev.doc.match_count;
+      insertPaper(ev.doc);
+    } else if (ev.type === 'done') {
+      progress.partial = false;
+      progress.truncated = ev.truncated;
+      progress.matches = ev.count;
+      for (const g of lastGrouped) if (g.zotero_key in ev.scores) g.score = ev.scores[g.zotero_key];
+      resortRows();
+      if (lastGrouped.length) showExportBtn();
+      else { $('#statusText').textContent = state.q ? 'No match' : 'No paper'; showEmpty(); return true; }
+    } else if (ev.type === 'error') {
+      $('#statusText').innerHTML = `Error: ${esc(ev.error)}`
+        + (lastGrouped.length ? ` <span class="note">(${fmt(lastGrouped.length)} partial result${lastGrouped.length !== 1 ? 's' : ''} shown)</span>` : '');
+      return true;
+    }
+    return false;
+  };
+
+  try {
+    lastSearchParams = apiQuery(state);
+    const r = await fetch(`/api/search/stream?${lastSearchParams}`, { signal: abort.signal });
+    if (seq !== searchSeq) return;
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      $('#statusText').textContent = `Error: ${data.error || r.statusText}`;
+      return;
+    }
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let silent = false;  // le statut final a déjà été écrit (vide ou erreur)
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (seq !== searchSeq) { reader.cancel().catch(() => {}); return; }
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const lines = buffer.split('\n');
+      buffer = done ? '' : lines.pop();
+      for (const line of lines) {
+        if (line.trim()) silent = handle(JSON.parse(line)) || silent;
+      }
+      if (!silent) setSearchStatus(state, progress);
+      if (done) break;
+    }
+    if (progress.partial && !silent) {
+      $('#statusText').innerHTML += ' <span class="note">(search interrupted)</span>';
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError' && seq === searchSeq) $('#statusText').textContent = `Fetch error: ${e.message}`;
+  } finally {
+    finish();
+  }
+}
+
+function showExportBtn() {
+  $('#statusRight').innerHTML = `<button class="btn small" onclick="copyShareLink()">${icon('link')}Copy link</button><button class="btn small" onclick="exportResults()">${icon('copy')}Copy results</button>`;
+}
+
+function parseYear(date) {
+  const m = (date || '').match(/\b(1[89]\d{2}|20\d{2})\b/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function compareDate(a, b, desc) {
+  const ya = parseYear(a.date);
+  const yb = parseYear(b.date);
+  if (ya === null && yb === null) return 0;
+  if (ya === null) return 1;  // undated items sink to the bottom
+  if (yb === null) return -1;
+  return desc ? yb - ya : ya - yb;
+}
+
+function sortComparator() {
+  const sortVal = $('#sortSelect').value;
+  if (sortVal === 'matches') return (a, b) => b.match_count - a.match_count;
+  if (sortVal === 'title') return (a, b) => (a.title || '').localeCompare(b.title || '');
+  if (sortVal === 'title-desc') return (a, b) => (b.title || '').localeCompare(a.title || '');
+  if (sortVal === 'date') return (a, b) => compareDate(a, b, false);
+  if (sortVal === 'date-desc') return (a, b) => compareDate(a, b, true);
+  if (sortVal === 'page') return (a, b) => (a.matches[0]?.page || 0) - (b.matches[0]?.page || 0);
+  // pertinence : score du serveur, puis nombre d'occurrences ; sans requête
+  // (score nul partout) l'ordre d'arrivée, alphabétique, est conservé
+  return (a, b) => (b.score - a.score) || (b.match_count - a.match_count);
+}
+
+function applySortAndRender() {
+  if (!lastGrouped) return;
+  if (lastGrouped.length) renderGrouped([...lastGrouped].sort(sortComparator()));
+  const url = stateToUrl(uiState());
+  if (url !== location.pathname + location.search) history.replaceState(null, '', url);
+}
+
+function viewerUrl(key, page, match) {
+  const p = new URLSearchParams({ key, page: page || 1 });
+  if (match) p.set('q', match.replace(/\s+/g, ' ').trim());
+  if ($('#caseCb').checked) p.set('case', '1');
+  return `/viewer?${p}`;
+}
+
+async function copyCitation(key, format, btn) {
+  const label = btn.textContent;
+  btn.textContent = '...';
+  try {
+    const r = await fetch(`/api/cite/${key}?format=${format}`);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Request failed');
+    await navigator.clipboard.writeText(data.text);
+    showToast(format === 'bibtex' ? 'BibTeX copied' : 'Citation copied');
+  } catch (e) {
+    showToast(e.message);
+  } finally {
+    btn.textContent = label;
+  }
+}
+
+function copyShareLink() {
+  navigator.clipboard.writeText(location.origin + stateToUrl(uiState())).then(() => showToast('Link copied'));
+}
+
+// ---------------------------------------------------------------- rendu des résultats
+
+function hitLocator(m) {
+  if (m.kind === 'page') return `p. ${m.page}`;
+  if (m.kind === 'annotation') return m.page ? `annot. p. ${m.page}` : 'annotation';
+  return m.kind;
+}
+
+function hitElement(g, m) {
+  // Titre, auteurs et notes ne figurent pas tels quels dans le PDF :
+  // on ouvre sans terme à surligner.
+  const findable = m.kind === 'page' || m.kind === 'annotation' || m.kind === 'abstract';
+  const a = document.createElement('a');
+  a.className = 'hit';
+  a.href = viewerUrl(g.zotero_key, m.page || 1, findable ? m.match : '');
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.innerHTML = `<span class="hit-loc">${esc(hitLocator(m))}</span><span class="hit-text">${highlightMatch(m.snippet, m.match)}</span>`;
+  a.addEventListener('click', e => e.stopPropagation());
+  return a;
+}
+
+function actionsHtml(g, cls) {
+  const c = cls ? ` class="${cls}"` : '';
+  return `
+    <a${c} href="${viewerUrl(g.zotero_key, g.matches[0]?.kind === 'page' ? g.matches[0].page : 1, '')}" target="_blank" rel="noopener">Open PDF</a>
+    ${g.zotero_select ? `<a${c} href="${esc(g.zotero_select)}" title="Select this item in the Zotero desktop app">Open in Zotero</a>` : ''}
+    ${g.zotero_web ? `<a${c} href="${esc(g.zotero_web)}" target="_blank" rel="noopener">zotero.org</a>` : ''}
+    ${g.parent_key ? `<button${c} data-cite="citation">Copy citation</button><button${c} data-cite="bibtex">Copy BibTeX</button>` : ''}
+    ${g.doi ? `<a${c} href="https://doi.org/${encodeURI(g.doi)}" target="_blank" rel="noopener">DOI</a>` : ''}`;
+}
+
+function bindActions(root, g) {
+  root.querySelectorAll('a, button[data-cite]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      if (el.dataset.cite) copyCitation(g.zotero_key, el.dataset.cite, el);
+    });
+  });
+}
+
+async function loadAllMatches(g) {
+  const r = await fetch(`/api/search?${lastSearchParams}&key=${g.zotero_key}`);
+  const data = await r.json();
+  if (data.error || !data.grouped.length) throw new Error(data.error || 'No matches');
+  g.matches = data.grouped[0].matches;
+}
+
+// Liste complète des occurrences d'un papier (dépliée dans la liste sur écran
+// étroit, dans le panneau de droite sur écran large).
+function fillHits(box, g) {
+  box.innerHTML = '';
+  for (const m of g.matches) box.appendChild(hitElement(g, m));
+  if (g.matches.length < g.match_count) {
+    const note = document.createElement('div');
+    note.className = 'hits-note';
+    note.innerHTML = `The first ${g.matches.length} of ${fmt(g.match_count)} matches are listed. <button type="button" class="link-btn">Show all</button>`;
+    note.querySelector('button').onclick = async (e) => {
+      e.stopPropagation();
+      note.textContent = 'Loading...';
+      try {
+        await loadAllMatches(g);
+        fillHits(box, g);
+      } catch (err) {
+        note.textContent = `Could not load all matches: ${err.message}`;
+      }
+    };
+    box.appendChild(note);
+  }
+}
+
+const PREVIEW_HITS = 3;
+
+const rowByKey = new Map();
+
+function paperRow(g) {
+  const row = document.createElement('article');
+  row.className = 'paper';
+  row.dataset.key = g.zotero_key;
+
+  // L'occurrence dans le titre est surlignée dans le titre lui-même plutôt
+  // que répétée comme extrait.
+  const titleHits = g.matches.filter(m => m.kind === 'title');
+  const preview = g.matches.filter(m => m.kind !== 'title').slice(0, PREVIEW_HITS);
+  const hidden = g.match_count - preview.length - titleHits.length;
+  row.innerHTML = `
+    <div class="paper-head">
+      <h3 class="paper-title">${highlightMatch(g.title, titleHits.map(m => m.match))}</h3>
+      ${g.match_count ? `<span class="paper-count"><b>${fmt(g.match_count)}</b> match${g.match_count !== 1 ? 'es' : ''}</span>` : ''}
+    </div>
+    <div class="paper-meta">
+      ${g.date ? `<span class="year">${esc(g.date)}</span>` : ''}
+      ${g.authors ? `<span>${esc(g.authors)}</span>` : ''}
+      ${g.publication ? `<span class="pub">${esc(g.publication)}</span>` : ''}
+      ${!g.date && !g.authors && !g.publication ? `<span>${esc(g.filename)}</span>` : ''}
+      <span class="tags">${(g.tags || []).slice(0, 6).map(t => `<span>${tagDot(t)}${esc(t)}</span>`).join('')}</span>
+    </div>
+    <div class="hits"></div>
+    <div class="paper-foot">
+      ${actionsHtml(g)}
+      ${hidden > 0 ? `<button type="button" class="more">Show ${fmt(hidden)} more</button>` : ''}
+    </div>
+  `;
+  const hits = row.querySelector('.hits');
+  for (const m of preview) hits.appendChild(hitElement(g, m));
+  bindActions(row.querySelector('.paper-foot'), g);
+
+  const more = row.querySelector('.more');
+  const expand = () => {
+    const open = row.classList.toggle('open');
+    if (open) fillHits(hits, g);
+    else { hits.innerHTML = ''; for (const m of preview) hits.appendChild(hitElement(g, m)); }
+    if (more) more.textContent = open ? 'Show fewer' : `Show ${fmt(hidden)} more`;
+  };
+  row.addEventListener('click', () => {
+    if (window.getSelection().toString()) return;  // sélection de texte en cours
+    if (wideMq.matches) selectPaper(g.zotero_key);
+    else if (hidden > 0) expand();
+  });
+  if (more) more.addEventListener('click', e => { e.stopPropagation(); expand(); });
+  if (g.zotero_key === selectedKey) row.classList.add('sel');
+  rowByKey.set(g.zotero_key, row);
+  return row;
+}
+
+function renderGrouped(groups) {
+  shownGroups = groups;
+  rowByKey.clear();
+  const frag = document.createDocumentFragment();
+  for (const g of groups) frag.appendChild(paperRow(g));
+  $('#results').innerHTML = '';
+  $('#results').appendChild(frag);
+
+  setPane(true);
+  if (wideMq.matches) selectPaper(groups.some(g => g.zotero_key === selectedKey) ? selectedKey : groups[0].zotero_key);
+}
+
+// Insère un papier reçu pendant la recherche à sa place dans le tri courant,
+// sans reconstruire la liste (ni déplacer ce que l'utilisateur regarde déjà).
+function insertPaper(g) {
+  lastGrouped.push(g);
+  const cmp = sortComparator();
+  let lo = 0, hi = shownGroups.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (cmp(shownGroups[mid], g) <= 0) lo = mid + 1; else hi = mid;
+  }
+  const next = shownGroups[lo];
+  shownGroups.splice(lo, 0, g);
+  $('#results').insertBefore(paperRow(g), next ? rowByKey.get(next.zotero_key) : null);
+  if (shownGroups.length === 1) {
+    setPane(true);
+    if (wideMq.matches) selectPaper(g.zotero_key);
+  }
+}
+
+// Fin de recherche : les scores définitifs peuvent changer légèrement l'ordre ;
+// on déplace les lignes existantes au lieu de les recréer (état déplié conservé).
+function resortRows() {
+  const sorted = [...lastGrouped].sort(sortComparator());
+  if (sorted.every((g, i) => g === shownGroups[i])) return;
+  shownGroups = sorted;
+  const box = $('#results');
+  for (const g of sorted) box.appendChild(rowByKey.get(g.zotero_key));
+}
+
+function selectPaper(key, { scroll = false } = {}) {
+  const g = shownGroups.find(x => x.zotero_key === key);
+  if (!g) return;
+  selectedKey = key;
+  document.querySelectorAll('.paper.sel').forEach(el => el.classList.remove('sel'));
+  const row = document.querySelector(`.paper[data-key="${CSS.escape(key)}"]`);
+  if (row) {
+    row.classList.add('sel');
+    if (scroll) row.scrollIntoView({ block: 'nearest' });
+  }
+  renderPane(g);
+}
+
+function renderPane(g) {
+  const pane = $('#pane');
+  pane.scrollTop = 0;
+  pane.innerHTML = `
+    <h2>${esc(g.title)}</h2>
+    <div class="pane-meta" id="paneMeta">
+      ${[g.date, g.authors].filter(Boolean).map(esc).join(', ')}${g.publication ? `${g.date || g.authors ? '. ' : ''}<span class="pub">${esc(g.publication)}</span>` : ''}
+    </div>
+    ${(g.tags || []).length ? `<div class="tags">${g.tags.map(t => `<span>${tagDot(t)}${esc(t)}</span>`).join('')}</div>` : ''}
+    <div class="pane-actions">${actionsHtml(g, 'btn small')}</div>
+    <div id="paneAbstract"></div>
+    ${g.match_count ? `<h3>Matches <span>${fmt(g.match_count)}</span></h3><div class="hits" id="paneHits"></div>` : ''}
+  `;
+  const open = pane.querySelector('.pane-actions a');
+  if (open) open.classList.add('primary');
+  bindActions(pane.querySelector('.pane-actions'), g);
+  if (g.match_count) fillHits($('#paneHits'), g);
+  loadAbstract(g.zotero_key);
+}
+
+async function loadAbstract(key) {
+  let item = itemCache.get(key);
+  if (!item) {
+    try {
+      const r = await fetch(`/api/item/${key}`);
+      if (!r.ok) return;
+      item = await r.json();
+      itemCache.set(key, item);
+    } catch { return; }
+  }
+  if (selectedKey !== key) return;  // la sélection a changé entre-temps
+  if (item.authors_full) {
+    const g = shownGroups.find(x => x.zotero_key === key);
+    $('#paneMeta').innerHTML = `${esc(item.authors_full.split(';').map(s => s.trim()).join(', '))}${g?.date ? ` (${esc(g.date)})` : ''}${g?.publication ? `. <span class="pub">${esc(g.publication)}</span>` : ''}`;
+  }
+  if (!item.abstract) return;
+  const box = $('#paneAbstract');
+  box.innerHTML = `<h3>Abstract</h3><p class="abstract clamp"></p><button type="button" class="link-btn" hidden>Show full abstract</button>`;
+  const p = box.querySelector('p');
+  const btn = box.querySelector('button');
+  p.textContent = item.abstract;
+  btn.hidden = p.scrollHeight <= p.clientHeight + 2;
+  btn.onclick = () => {
+    const clamped = p.classList.toggle('clamp');
+    btn.textContent = clamped ? 'Show full abstract' : 'Show less';
+  };
+}
+
+wideMq.addEventListener('change', () => { if (lastGrouped) applySortAndRender(); });
+
+function exportResults() {
+  let text = '';
+  if (lastGrouped) {
+    for (const g of lastGrouped) {
+      text += `## ${g.title}\n`;
+      if (g.date) text += `Date: ${g.date}\n`;
+      if (g.authors) text += `Authors: ${g.authors}\n`;
+      text += `Matches: ${g.match_count}\n\n`;
+      for (const m of g.matches) {
+        text += `  - ${m.kind === 'page' ? 'p.' + m.page : m.kind}: "${m.match}" - ${m.snippet}\n`;
+      }
+      text += '\n';
+    }
+  }
+  if (!text) { showToast('No results to export'); return; }
+  navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'));
+}
+
+function highlightMatch(snippet, match) {
+  const escaped = esc(snippet);
+  // Un ou plusieurs termes ; les plus longs d'abord pour l'alternance.
+  const terms = [...new Set([].concat(match).map(esc).filter(Boolean))].sort((a, b) => b.length - a.length);
+  if (!terms.length) return escaped;
+  try {
+    const re = new RegExp(`(${terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+    return escaped.replace(re, '<mark>$1</mark>');
+  } catch { return escaped; }
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML.replace(/"/g, '&quot;');
+}
+
+function showToast(msg) {
+  const toast = $('#toast');
+  toast.textContent = msg;
+  toast.classList.add('visible');
+  setTimeout(() => toast.classList.remove('visible'), 2500);
+}
+
+async function triggerSync() {
+  if (!currentUser?.has_zotero) {
+    $('#syncDot').className = 'dot error';
+    $('#syncLabel').textContent = 'No Zotero credentials configured';
+    showToast('Configure your Zotero settings first');
+    openSettings();
+    return;
+  }
+  $('#syncBtn').disabled = true;
+  await fetch('/api/sync', { method: 'POST' });
+  pollSync();
+}
+
+let syncRunning = false;
+async function onSyncBtn() {
+  if (!syncRunning) return triggerSync();
+  $('#syncBtn').disabled = true;
+  await fetch('/api/sync/cancel', { method: 'POST' });
+  pollSync();
+}
+
+let pollTimer = null;
+async function pollSync() {
+  try {
+    const r = await fetch('/api/sync/status');
+    const d = await r.json();
+    const dot = $('#syncDot');
+    const label = $('#syncLabel');
+    const log = $('#syncLog');
+
+    if (d.running !== syncRunning) {
+      if (syncRunning && !d.running) loadFacets();  // la sync vient de finir
+      syncRunning = d.running;
+      $('#syncBtn').textContent = syncRunning ? 'Cancel' : 'Sync';
+      $('#syncBtn').disabled = false;
+    }
+    if (d.running) {
+      dot.className = 'dot running';
+      label.textContent = 'Syncing...';
+      log.style.display = 'block';
+      log.innerHTML = (d.log && d.log.length) ? d.log.map(l => `<div>${esc(l)}</div>`).join('') : '<div>Starting sync...</div>';
+      log.scrollTop = log.scrollHeight;
+      if (!pollTimer) pollTimer = setInterval(pollSync, 1500);
+    } else {
+      const isError = d.message && (d.message.includes('Error:') || d.message.includes('No Zotero'));
+      dot.className = isError ? 'dot error' : 'dot done';
+      label.textContent = d.message || 'Idle';
+      $('#syncBtn').disabled = false;
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      setTimeout(() => { log.style.display = 'none'; }, 3000);
+    }
+    label.title = label.textContent;
+    dot.title = label.textContent;
+
+    if (d.pdf_count != null) $('#statPdfs').textContent = fmt(d.pdf_count);
+    if (d.page_count != null) $('#statPages').textContent = fmt(d.page_count);
+    $('#statNoText').hidden = $('#statNoTextLabel').hidden = !d.no_text_count;
+    if (d.no_text_count) {
+      $('#statNoText').innerHTML = `<button type="button" class="stat-link" onclick="showNoText()" title="PDFs with no searchable text">${fmt(d.no_text_count)}</button>`;
+    }
+    if (d.last_sync) {
+      const dt = new Date(d.last_sync);
+      $('#syncLastTime').textContent = dt.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+  } catch {}
+}
+
+setInterval(pollSync, 30000);
+
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    const q = $('#query');
+    if (q) { q.focus(); q.select(); }
+  }
+  if (e.key === 'Escape') {
+    if (!$('#infoModal').classList.contains('hidden')) closeInfo();
+    else if (!$('#settingsModal').classList.contains('hidden')) closeSettings();
+    else toggleFilters(false);
+  }
+  // Écran large : flèches pour parcourir les papiers, Entrée pour ouvrir le PDF.
+  const typing = /^(INPUT|SELECT|TEXTAREA|BUTTON|A)$/.test(document.activeElement?.tagName || '');
+  const modalOpen = document.querySelector('.modal-overlay:not(.hidden)');
+  if (typing || modalOpen || !wideMq.matches || !shownGroups.length || e.ctrlKey || e.metaKey || e.altKey) return;
+  const i = shownGroups.findIndex(g => g.zotero_key === selectedKey);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const next = Math.min(shownGroups.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)));
+    selectPaper(shownGroups[next].zotero_key, { scroll: true });
+  } else if (e.key === 'Enter' && i >= 0) {
+    const g = shownGroups[i];
+    window.open(viewerUrl(g.zotero_key, g.matches[0]?.kind === 'page' ? g.matches[0].page : 1, ''), '_blank');
+  }
+});
+
+if (navigator.platform.includes('Mac')) {
+  const kbd = $('#searchKbd');
+  if (kbd) kbd.textContent = '⌘K';
+}
+
+window.addEventListener('scroll', () => {
+  $('#scrollTopBtn').classList.toggle('visible', window.scrollY > 400);
+});
+
+$('#settingsModal').addEventListener('click', (e) => {
+  if (e.target === $('#settingsModal')) closeSettings();
+});
+$('#infoModal').addEventListener('click', (e) => {
+  if (e.target === $('#infoModal')) closeInfo();
+});
+
+init();
+</script>
+</body>
+</html>
